@@ -8,6 +8,9 @@ import { askAI, type AiKind } from "@/lib/ai";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { Field, PageHeader } from "@/components/ui";
 import { cx } from "@/lib/utils";
+import Link from "next/link";
+import { usePlan } from "@/lib/usePlan";
+import { IoDiamondOutline } from "react-icons/io5";
 
 type F = { name: string; label: string; placeholder?: string; long?: boolean; options?: string[] };
 const MODES: Record<AiKind, { label: string; icon: typeof IoMegaphoneOutline; fields: F[] }> = {
@@ -42,6 +45,7 @@ export default function AIPage() {
   const [err, setErr] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [savedNote, setSavedNote] = useState(false);
+  const plan = usePlan();
   const cfg = MODES[mode];
   const get = (f: F) => vals[`${mode}.${f.name}`] ?? (f.options ? f.options[0] : "");
 
@@ -51,6 +55,7 @@ export default function AIPage() {
     try {
       const input = Object.fromEntries(cfg.fields.map((f) => [f.name, get(f)]));
       setOut(await askAI(mode, input));
+      plan.reload();
     } catch (e) { setErr((e as Error).message); }
     setBusy(false);
   }
@@ -62,7 +67,10 @@ export default function AIPage() {
 
   return (
     <div>
-      <PageHeader title="AI helper" subtitle="Draft captions, proposals and client emails" />
+      <PageHeader title="AI helper" subtitle="Draft captions, proposals and client emails"
+        action={!plan.loading && (plan.premium
+          ? <span className="chip bg-brand/15 text-brand"><IoDiamondOutline className="mr-1" /> Unlimited</span>
+          : <Link href="/billing" className="btn-ghost text-xs">{Math.max(0, 5 - plan.aiUsedToday)}/5 free today · <span className="text-brand">Go unlimited</span></Link>)} />
       <div className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
         {(Object.keys(MODES) as AiKind[]).map((k) => {
           const { label, icon: Icon } = MODES[k];
@@ -91,7 +99,7 @@ export default function AIPage() {
             </Field>
           ))}
           <button className="btn-primary w-full py-2.5" disabled={busy}><IoSparklesOutline /> {busy ? "Writing…" : "Generate"}</button>
-          {err && <p className="text-sm text-bad">{err}</p>}
+          {err && <p className="text-sm text-bad">{err} {err.includes("Upgrade") && <Link href="/billing" className="font-medium text-brand underline">Upgrade</Link>}</p>}
         </form>
 
         <div className="card flex min-h-[320px] flex-col">

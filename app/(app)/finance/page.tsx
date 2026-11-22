@@ -1,7 +1,9 @@
 "use client";
 import { useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { IoAdd, IoTrendingUp, IoTrendingDown, IoWalletOutline, IoTrashOutline, IoStatsChartOutline } from "react-icons/io5";
+import { IoAdd, IoTrendingUp, IoTrendingDown, IoWalletOutline, IoTrashOutline, IoStatsChartOutline, IoDownloadOutline, IoDiamondOutline } from "react-icons/io5";
+import Link from "next/link";
+import { usePlan } from "@/lib/usePlan";
 import { useTable } from "@/lib/useTable";
 import type { Txn } from "@/lib/types";
 import { Badge, Empty, ErrorBar, Field, Modal, PageHeader, Spinner } from "@/components/ui";
@@ -16,6 +18,16 @@ export default function FinancePage() {
   const tx = useTable<Txn>("hh_transactions", { order: "date", ascending: false });
   const [open, setOpen] = useState(false);
   const [range, setRange] = useState(6);
+  const plan = usePlan();
+
+  function exportCsv() {
+    const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const rows = [["Date", "Type", "Category", "Description", "Amount"], ...tx.rows.map((t) => [t.date, t.kind, t.category, t.description ?? "", t.kind === "income" ? t.amount : -t.amount])];
+    const blob = new Blob([rows.map((r) => r.map(esc).join(",")).join("\n")], { type: "text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = `hustle-hub-finances-${today()}.csv`; a.click();
+    URL.revokeObjectURL(a.href);
+  }
   const [form, setForm] = useState({ kind: "expense" as Txn["kind"], amount: "", category: "Software", description: "", date: today() });
 
   const months = useMemo(() => monthly(tx.rows, range), [tx.rows, range]);
@@ -41,7 +53,12 @@ export default function FinancePage() {
   return (
     <div>
       <PageHeader title="Finance" subtitle="Income, expenses and profit"
-        action={<div className="flex gap-2">
+        action={<div className="flex flex-wrap gap-2">
+          {plan.premium ? (
+            <button className="btn-ghost" onClick={exportCsv} disabled={!tx.rows.length}><IoDownloadOutline /> Export CSV</button>
+          ) : (
+            <Link href="/billing" className="btn-ghost text-brand"><IoDiamondOutline /> Export CSV</Link>
+          )}
           <button className="btn-ghost" onClick={() => startNew("expense")}><IoTrendingDown className="text-bad" /> Expense</button>
           <button className="btn-primary" onClick={() => startNew("income")}><IoAdd size={18} /> Income</button>
         </div>} />

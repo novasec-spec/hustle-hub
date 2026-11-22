@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { generateText } from "ai";
 import { supabaseServer } from "@/lib/supabase/server";
+import { FREE_AI_PER_DAY } from "@/lib/payments/config";
 
 export const maxDuration = 60;
 const MODEL = process.env.AI_MODEL || "anthropic/claude-haiku-5.5";
@@ -46,8 +47,20 @@ export async function POST(req: Request) {
   const prompt = buildPrompt(body.kind ?? "free", body.input ?? {});
   if (!prompt.trim()) return NextResponse.json({ error: "Tell the AI what to write." }, { status: 400 });
 
+  // Free plan: FREE_AI_PER_DAY generations per day. Premium: unlimited.
+  const { data: sub } = await sb.from("hh_subscriptions").select("current_period_end").maybeSingle();
+  const premium = !!sub && new Date(sub.current_period_end) > new Date();
+  if (!premium) {
+    const start = new Date(); start.setUTCHours(0, 0, 0, 0);
+    const { count } = await sb.from("hh_ai_usage").select("id", { count: "exact", head: true }).gte("created_at", start.toISOString());
+    if ((count ?? 0) >= FREE_AI_PER_DAY) {
+      return NextResponse.json({ error: `You've used your ${FREE_AI_PER_DAY} free AI generations today. Upgrade to Premium for unlimited.`, upgrade: true }, { status: 402 });
+    }
+  }
+
   try {
     const { text } = await generateText({ model: MODEL, instructions: SYSTEM, prompt, maxOutputTokens: 900 });
+    await sb.from("hh_ai_usage").insert({});
     return NextResponse.json({ text: text.trim() });
   } catch (e) {
     console.error("AI error", e);

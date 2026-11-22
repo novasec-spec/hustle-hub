@@ -5,8 +5,9 @@ import { useState } from "react";
 import {
   IoHomeOutline, IoPeopleOutline, IoReceiptOutline, IoGridOutline, IoCalendarOutline,
   IoDocumentTextOutline, IoFolderOpenOutline, IoStatsChartOutline, IoSparklesOutline,
-  IoLogOutOutline, IoMenu, IoClose,
+  IoLogOutOutline, IoMenu, IoClose, IoDiamondOutline,
 } from "react-icons/io5";
+import { usePlan } from "@/lib/usePlan";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { Logo } from "./Logo";
 import { cx } from "@/lib/utils";
@@ -21,12 +22,14 @@ const NAV = [
   { href: "/files", label: "Files", icon: IoFolderOpenOutline },
   { href: "/finance", label: "Finance", icon: IoStatsChartOutline },
   { href: "/ai", label: "AI Helper", icon: IoSparklesOutline },
+  { href: "/billing", label: "Billing", icon: IoDiamondOutline },
 ];
 
 export function Sidebar({ email }: { email: string }) {
   const path = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const plan = usePlan();
 
   async function signOut() {
     await supabaseBrowser().auth.signOut();
@@ -51,6 +54,13 @@ export function Sidebar({ email }: { email: string }) {
 
   const footer = (
     <div className="mt-4 border-t border-line pt-4">
+      {!plan.loading && (plan.premium ? (
+        <p className="mb-2 flex items-center gap-1.5 px-3 text-xs font-medium text-brand"><IoDiamondOutline /> Premium</p>
+      ) : (
+        <Link href="/billing" onClick={() => setOpen(false)} className="mx-1 mb-3 flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand/15 to-brand2/10 px-3 py-2 text-xs font-medium text-brand hover:from-brand/25">
+          <IoDiamondOutline /> Upgrade to Premium
+        </Link>
+      ))}
       <p className="truncate px-3 text-xs text-mute">{email}</p>
       <button onClick={signOut} className="mt-2 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-mute hover:bg-panel2 hover:text-ink">
         <IoLogOutOutline size={19} /> Sign out
