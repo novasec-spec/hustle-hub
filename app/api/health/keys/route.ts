@@ -33,8 +33,8 @@ export async function GET(req: Request) {
       }
       throw new Error(errors.join(" | "));
     }) : { ok: false, error: "not set" },
-    env.MPESA_CONSUMER_KEY ? check(mpesaToken) : { ok: false, error: "not set" },
-    env.PAYPAL_CLIENT_ID ? check(paypalToken) : { ok: false, error: "not set" },
+    env.MPESA_CONSUMER_KEY ? check(async () => { await mpesaToken(); }) : { ok: false, error: "not set" },
+    env.PAYPAL_CLIENT_ID ? check(async () => { await paypalToken(); }) : { ok: false, error: "not set" },
     env.PAYSTACK_SECRET_KEY ? check(async () => {
       const r = await fetch("https://api.paystack.co/transaction?perPage=1", { headers: { Authorization: `Bearer ${env.PAYSTACK_SECRET_KEY}` } });
       if (!r.ok) throw new Error(`${r.status} ${(await r.text()).slice(0, 120)}`);
