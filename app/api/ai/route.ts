@@ -1,22 +1,10 @@
 import { NextResponse } from "next/server";
-import { generateText, type LanguageModel } from "ai";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { generateText } from "ai";
+import { aiModels } from "@/lib/ai-models";
 import { supabaseServer } from "@/lib/supabase/server";
 import { FREE_AI_PER_DAY } from "@/lib/payments/config";
 
 export const maxDuration = 60;
-const MODEL = process.env.AI_MODEL || "anthropic/claude-haiku-5.5";
-const GEMINI_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-flash-latest";
-
-/** Gemini first (when a key is set), then Vercel AI Gateway as a fallback. */
-function models(): { name: string; model: LanguageModel }[] {
-  const list: { name: string; model: LanguageModel }[] = [];
-  if (GEMINI_KEY) list.push({ name: `google/${GEMINI_MODEL}`, model: createGoogleGenerativeAI({ apiKey: GEMINI_KEY })(GEMINI_MODEL) });
-  if (process.env.AI_GATEWAY_FALLBACK !== "off") list.push({ name: MODEL, model: MODEL });
-  return list;
-}
-
 const SYSTEM = `You are the writing assistant inside Hustle Hub, a workspace for freelancers and content creators.
 Write ready-to-use copy. No preamble like "Here's your caption", no markdown headings, no emoji unless the user asks for them.
 Keep it natural, specific and human. Use the details given; invent nothing about real people or prices that were not provided (use [placeholders] instead).`;
@@ -69,7 +57,7 @@ export async function POST(req: Request) {
     }
   }
 
-  for (const { name, model } of models()) {
+  for (const { name, model } of aiModels()) {
     try {
       const { text } = await generateText({ model, instructions: SYSTEM, prompt, maxOutputTokens: 900, maxRetries: 1 });
       if (!text.trim()) throw new Error("empty response");

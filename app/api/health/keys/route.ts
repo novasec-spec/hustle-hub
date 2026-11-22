@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { generateText } from "ai";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { aiModels } from "@/lib/ai-models";
 import { mpesaToken, paypalToken } from "@/lib/payments/providers";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +14,7 @@ function authorized(req: Request) {
 }
 
 async function check(fn: () => Promise<unknown>) {
-  try { await fn(); return { ok: true }; }
+  try { const r = await fn(); return typeof r === "string" ? { ok: true, via: r } : { ok: true }; }
   catch (e) { return { ok: false, error: String(e instanceof Error ? e.message : e).slice(0, 200) }; }
 }
 
@@ -24,8 +24,14 @@ export async function GET(req: Request) {
   const gemini = env.GEMINI_API_KEY || env.GOOGLE_GENERATIVE_AI_API_KEY;
   const results = await Promise.all([
     gemini ? check(async () => {
-      const { text } = await generateText({ model: createGoogleGenerativeAI({ apiKey: gemini })(env.GEMINI_MODEL || "gemini-flash-latest"), prompt: "Reply with OK", maxOutputTokens: 20, maxRetries: 0 });
-      if (!text) throw new Error("empty response");
+      const errors: string[] = [];
+      for (const { name, model } of aiModels().filter((m) => m.name.startsWith("google/"))) {
+        try {
+          const { text } = await generateText({ model, prompt: "Reply with OK", maxOutputTokens: 20, maxRetries: 0 });
+          if (text) return name;
+        } catch (e) { errors.push(`${name}: ${String(e instanceof Error ? e.message : e).slice(0, 80)}`); }
+      }
+      throw new Error(errors.join(" | "));
     }) : { ok: false, error: "not set" },
     env.MPESA_CONSUMER_KEY ? check(mpesaToken) : { ok: false, error: "not set" },
     env.PAYPAL_CLIENT_ID ? check(paypalToken) : { ok: false, error: "not set" },
