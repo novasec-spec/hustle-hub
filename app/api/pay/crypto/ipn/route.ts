@@ -9,8 +9,8 @@ const sortDeep = (v: Json): Json =>
   : v;
 
 function validSig(body: Record<string, Json>, sig: string | null) {
-  if (!sig) return false;
-  const secret = process.env.NOWPAYMENTS_IPN_SECRET!.trim();
+  const secret = process.env.NOWPAYMENTS_IPN_SECRET?.trim();
+  if (!sig || !secret) return false;
   // NOWPayments signs the key-sorted JSON; accept both their documented JS and Python sort styles.
   const candidates = [JSON.stringify(sortDeep(body)), JSON.stringify(body, Object.keys(body).sort())];
   return candidates.some((s) => {
