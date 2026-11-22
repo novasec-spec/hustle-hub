@@ -1,10 +1,21 @@
 import { NextResponse } from "next/server";
-import { generateText } from "ai";
+import { generateText, type LanguageModel } from "ai";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { supabaseServer } from "@/lib/supabase/server";
 import { FREE_AI_PER_DAY } from "@/lib/payments/config";
 
 export const maxDuration = 60;
 const MODEL = process.env.AI_MODEL || "anthropic/claude-haiku-5.5";
+const GEMINI_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-flash-latest";
+
+/** Gemini first (when a key is set), then Vercel AI Gateway as a fallback. */
+function models(): { name: string; model: LanguageModel }[] {
+  const list: { name: string; model: LanguageModel }[] = [];
+  if (GEMINI_KEY) list.push({ name: `google/${GEMINI_MODEL}`, model: createGoogleGenerativeAI({ apiKey: GEMINI_KEY })(GEMINI_MODEL) });
+  if (process.env.AI_GATEWAY_FALLBACK !== "off") list.push({ name: MODEL, model: MODEL });
+  return list;
+}
 
 const SYSTEM = `You are the writing assistant inside Hustle Hub, a workspace for freelancers and content creators.
 Write ready-to-use copy. No preamble like "Here's your caption", no markdown headings, no emoji unless the user asks for them.
@@ -58,12 +69,15 @@ export async function POST(req: Request) {
     }
   }
 
-  try {
-    const { text } = await generateText({ model: MODEL, instructions: SYSTEM, prompt, maxOutputTokens: 900 });
-    await sb.from("hh_ai_usage").insert({});
-    return NextResponse.json({ text: text.trim() });
-  } catch (e) {
-    console.error("AI error", e);
-    return NextResponse.json({ error: "The AI helper is unavailable right now. Try again in a moment." }, { status: 502 });
+  for (const { name, model } of models()) {
+    try {
+      const { text } = await generateText({ model, instructions: SYSTEM, prompt, maxOutputTokens: 900, maxRetries: 1 });
+      if (!text.trim()) throw new Error("empty response");
+      await sb.from("hh_ai_usage").insert({});
+      return NextResponse.json({ text: text.trim(), model: name });
+    } catch (e) {
+      console.error(`AI error (${name})`, e);
+    }
   }
+  return NextResponse.json({ error: "The AI helper is unavailable right now. Try again in a moment." }, { status: 502 });
 }
