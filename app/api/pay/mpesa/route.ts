@@ -25,7 +25,7 @@ export async function POST(req: Request) {
         AccountReference: "HustleHub", TransactionDesc: "Hustle Hub Premium",
       }),
     });
-    const data = await readJson<{ CheckoutRequestID: string; ResponseCode: string; CustomerMessage: string }>(r);
+    const data = await readJson<{ CheckoutRequestID: string; ResponseCode: string; CustomerMessage: string }>(r).catch(async (e) => { await settle(id, "failed", { error: String(e).slice(0, 200) }); throw e; });
     if (data.ResponseCode !== "0") { await settle(id, "failed", { stk: data }); throw new HttpError(400, data.CustomerMessage || "M-Pesa rejected the request."); }
     await setRef(id, data.CheckoutRequestID, { phone: msisdn.replace(/(\d{6})\d{3}/, "$1***") });
     return Response.json({ paymentId: id, message: "Check your phone and enter your M-Pesa PIN." });

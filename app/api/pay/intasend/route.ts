@@ -1,6 +1,6 @@
 import { PRICE, enabledProviders } from "@/lib/payments/config";
 import { intasendBase } from "@/lib/payments/providers";
-import { callbackToken, errorResponse, HttpError, originOf, readJson, setRef, startPayment } from "@/lib/payments/server";
+import { callbackToken, errorResponse, HttpError, originOf, readJson, setRef, settle, startPayment } from "@/lib/payments/server";
 
 /** POST → creates an IntaSend checkout (M-Pesa, cards) and returns its URL */
 export async function POST(req: Request) {
@@ -15,10 +15,10 @@ export async function POST(req: Request) {
       body: JSON.stringify({
         public_key: key, amount: PRICE.KES, currency: "KES", email: user.email,
         api_ref: id, host: origin, comment: "Hustle Hub Premium",
-        redirect_url: `${origin}/api/pay/intasend/return?pid=${id}&t=${callbackToken(id)}`,
+        redirect_url: `${origin}/api/pay/intasend/return/${id}/${callbackToken(id)}`,
       }),
     });
-    const data = await readJson<{ id: string; url: string; signature: string }>(r);
+    const data = await readJson<{ id: string; url: string; signature: string }>(r).catch(async (e) => { await settle(id, "failed", { error: String(e).slice(0, 200) }); throw e; });
     await setRef(id, data.id, { signature: data.signature });
     return Response.json({ paymentId: id, url: data.url });
   } catch (e) { return errorResponse(e); }

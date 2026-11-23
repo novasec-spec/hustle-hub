@@ -1,6 +1,6 @@
 import { PRICE, enabledProviders } from "@/lib/payments/config";
 import { nowBase } from "@/lib/payments/providers";
-import { errorResponse, HttpError, originOf, readJson, setRef, startPayment } from "@/lib/payments/server";
+import { errorResponse, HttpError, originOf, readJson, setRef, settle, startPayment } from "@/lib/payments/server";
 
 // NOWPayments hosted invoice: customer picks BTC, ETH, USDT, etc. Confirmation arrives by signed IPN.
 export async function POST(req: Request) {
@@ -19,7 +19,7 @@ export async function POST(req: Request) {
         cancel_url: `${origin}/billing?canceled=crypto`,
       }),
     });
-    const inv = await readJson<{ id: string | number; invoice_url: string }>(r);
+    const inv = await readJson<{ id: string | number; invoice_url: string }>(r).catch(async (e) => { await settle(id, "failed", { error: String(e).slice(0, 200) }); throw e; });
     await setRef(id, String(inv.id));
     return Response.json({ paymentId: id, url: inv.invoice_url });
   } catch (e) { return errorResponse(e); }

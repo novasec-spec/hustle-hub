@@ -1,5 +1,5 @@
 import { PRICE, enabledProviders } from "@/lib/payments/config";
-import { errorResponse, HttpError, originOf, readJson, setRef, startPayment } from "@/lib/payments/server";
+import { errorResponse, HttpError, originOf, readJson, setRef, settle, startPayment } from "@/lib/payments/server";
 
 // Paystack (Kenya): cards + M-Pesa. Test vs live is decided by the key (sk_test_… / sk_live_…).
 const CURRENCY = () => (process.env.PAYSTACK_CURRENCY || "KES").toUpperCase();
@@ -19,7 +19,7 @@ export async function POST(req: Request) {
         metadata: { app: "hustle-hub", payment_id: id },
       }),
     });
-    const data = await readJson<{ status: boolean; message: string; data: { authorization_url: string; reference: string } }>(r);
+    const data = await readJson<{ status: boolean; message: string; data: { authorization_url: string; reference: string } }>(r).catch(async (e) => { await settle(id, "failed", { error: String(e).slice(0, 200) }); throw e; });
     if (!data.status) throw new HttpError(400, data.message);
     await setRef(id, data.data.reference);
     return Response.json({ paymentId: id, url: data.data.authorization_url });

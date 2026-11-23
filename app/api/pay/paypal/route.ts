@@ -1,6 +1,6 @@
 import { PRICE, enabledProviders } from "@/lib/payments/config";
 import { paypalBase, paypalToken } from "@/lib/payments/providers";
-import { callbackToken, errorResponse, HttpError, originOf, readJson, setRef, startPayment } from "@/lib/payments/server";
+import { callbackToken, errorResponse, HttpError, originOf, readJson, setRef, settle, startPayment } from "@/lib/payments/server";
 
 /** POST → creates a PayPal order and returns the approval URL */
 export async function POST(req: Request) {
@@ -21,7 +21,7 @@ export async function POST(req: Request) {
         } } },
       }),
     });
-    const order = await readJson<{ id: string; links: { rel: string; href: string }[] }>(r);
+    const order = await readJson<{ id: string; links: { rel: string; href: string }[] }>(r).catch(async (e) => { await settle(id, "failed", { error: String(e).slice(0, 200) }); throw e; });
     const link = order.links.find((l) => l.rel === "payer-action" || l.rel === "approve");
     if (!link) throw new Error("PayPal did not return an approval link");
     await setRef(id, order.id);
