@@ -17,7 +17,7 @@ export async function POST(req: Request) {
         payment_source: { paypal: { experience_context: {
           brand_name: "Hustle Hub", user_action: "PAY_NOW", shipping_preference: "NO_SHIPPING",
           return_url: `${origin}/api/pay/paypal/return?pid=${id}&t=${callbackToken(id)}`,
-          cancel_url: `${origin}/billing?canceled=paypal`,
+          cancel_url: `${origin}/api/pay/paypal/cancel?pid=${id}&t=${callbackToken(id)}`,
         } } },
       }),
     });
